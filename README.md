@@ -1,35 +1,20 @@
-# React + TypeScript + Vite
+# 🐾 Queue Dashboard 
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Dashboard interactivo para la gestión de turnos y atención en clínicas veterinarias, construido con React y APIs nativas del navegador.
 
-Currently, two official plugins are available:
+## 🚀 Características
+- **Identificación por RUT:** Registro y validación del dueño y mascota.
+- **Alertas Auditivas:** Notificaciones con tono y voz (`Web Speech API`) al llamar pacientes a los boxes.
+- **Persistencia Local:** Gestión del estado de la fila en tiempo real.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 🛠️ Tecnologías Utilizadas
+- React (Vite / TypeScript)
+- Tailwind CSS
+- Web Audio API & Web Speech API
 
-## React Compiler
-
-The React Compiler is enabled on this template. See [this documentation](https://react.dev/learn/react-compiler) for more information.
-
-Note: This will impact Vite dev & build performances.
-You can also try [the experimental native React Compiler support in plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md#rust-react-compiler) by using `compiler: true` in the plugin options instead of using the Babel plugin.
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
-```
-
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+## 🔧 Instalación Local
+```bash
+git clone [https://github.com/TU-USUARIO/TU-REPOSITORIO.git](https://github.com/TU-USUARIO/TU-REPOSITORIO.git)
+cd TU-REPOSITORIO
+npm install
+npm run dev
