@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Ticket } from '../types/queue';
-
 import { minutesSince, useNow } from '../hooks/useNow';
+import { useCallSound } from '../hooks/useCallSound';
 import { getVet, VETERINARIANS } from '../data/Veterinarians';
 
 interface Props {
@@ -9,7 +9,7 @@ interface Props {
 }
 
 const MAX_VISIBLE = 8;
-const RECENT_CALL_MS = 90_000; // cuánto tiempo se destaca el último llamado
+const RECENT_CALL_MS = 40_000; // cuánto tiempo se destaca el último llamado
 
 const initials = (name: string) =>
     name
@@ -20,9 +20,9 @@ const initials = (name: string) =>
         .join('')
         .toUpperCase();
 
-
+/** Pantalla para el monitor de la sala de espera. No muestra RUT ni datos del dueño. */
 export default function WaitingRoom({ tickets }: Props) {
-    const now = useNow(5_000);
+    const now = useNow(1_000); // 1 s para que el reloj muestre los segundos
     const rootRef = useRef<HTMLDivElement>(null);
     const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -31,6 +31,31 @@ export default function WaitingRoom({ tickets }: Props) {
         document.addEventListener('fullscreenchange', onChange);
         return () => document.removeEventListener('fullscreenchange', onChange);
     }, []);
+
+    // Sonido: se anuncia cada llamado nuevo. Al abrir la vista se registran los
+    // llamados que ya existían para que no suenen de golpe.
+    const { enabled: soundOn, toggle: toggleSound, announce } = useCallSound();
+    const seenCalls = useRef<Set<string> | null>(null);
+
+    useEffect(() => {
+        const calls = tickets
+            .filter((t) => t.status === 'Recibido' && t.calledAt)
+            .map((t) => ({ ticket: t, key: `${t.id}@${t.calledAt!.getTime()}` }));
+
+        if (seenCalls.current === null) {
+            seenCalls.current = new Set(calls.map((c) => c.key));
+            return;
+        }
+
+        for (const { ticket, key } of calls) {
+            if (seenCalls.current.has(key)) continue;
+            seenCalls.current.add(key);
+            const room = getVet(ticket.vetId)?.room ?? 'consulta';
+            announce(
+                `Turno ${ticket.ticketNumber.replace('-', ' ')}. ${ticket.petName}, pase a ${room}.`,
+            );
+        }
+    }, [tickets, announce]);
 
     const toggleFullscreen = () => {
         if (document.fullscreenElement) void document.exitFullscreen();
@@ -71,7 +96,11 @@ export default function WaitingRoom({ tickets }: Props) {
                 <div className="flex items-center gap-4">
                     <div className="text-right leading-tight">
                         <p className="text-3xl md:text-5xl font-mono font-bold text-teal-300">
-                            {now.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}
+                            {now.toLocaleTimeString('es-CL', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                second: '2-digit',
+                            })}
                         </p>
                         <p className="text-sm text-slate-400 capitalize">
                             {now.toLocaleDateString('es-CL', {
@@ -81,6 +110,16 @@ export default function WaitingRoom({ tickets }: Props) {
                             })}
                         </p>
                     </div>
+                    <button
+                        onClick={toggleSound}
+                        aria-pressed={soundOn}
+                        className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${soundOn
+                            ? 'border-teal-400 bg-teal-600 text-white'
+                            : 'border-white/20 text-slate-200 hover:bg-white/10'
+                            }`}
+                    >
+                        {soundOn ? '🔔 Sonido activado' : '🔕 Activar sonido'}
+                    </button>
                     <button
                         onClick={toggleFullscreen}
                         className="rounded-xl border border-white/20 px-3 py-2 text-sm font-semibold text-slate-200 hover:bg-white/10 transition"
@@ -209,7 +248,7 @@ export default function WaitingRoom({ tickets }: Props) {
                             })}
                         </ol>
                     )}
-                    {/* Si hay mas en espera del limite visible renderizar esto */}
+
                     {waiting.length > MAX_VISIBLE && (
                         <p className="text-slate-400 text-sm">
                             y {waiting.length - MAX_VISIBLE} más en espera…
