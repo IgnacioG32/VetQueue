@@ -1,94 +1,221 @@
+import { useEffect, useRef, useState } from 'react';
 import type { Ticket } from '../types/queue';
-import { useNow } from '../hooks/useNow';
-import { VETERINARIANS, getVet } from '../data/Veterinarians';
+
+import { minutesSince, useNow } from '../hooks/useNow';
+import { getVet, VETERINARIANS } from '../data/Veterinarians';
 
 interface Props {
     tickets: Ticket[];
 }
 
 const MAX_VISIBLE = 8;
+const RECENT_CALL_MS = 90_000; // cuánto tiempo se destaca el último llamado
 
-/** Pantalla para el monitor de la sala de espera. No muestra RUT ni datos del dueño. */
+const initials = (name: string) =>
+    name
+        .replace(/^Dra?\.\s*/, '')
+        .split(' ')
+        .map((part) => part[0])
+        .slice(0, 2)
+        .join('')
+        .toUpperCase();
+
+
 export default function WaitingRoom({ tickets }: Props) {
-    const now = useNow(10_000);
+    const now = useNow(5_000);
+    const rootRef = useRef<HTMLDivElement>(null);
+    const [isFullscreen, setIsFullscreen] = useState(false);
+
+    useEffect(() => {
+        const onChange = () => setIsFullscreen(document.fullscreenElement === rootRef.current);
+        document.addEventListener('fullscreenchange', onChange);
+        return () => document.removeEventListener('fullscreenchange', onChange);
+    }, []);
+
+    const toggleFullscreen = () => {
+        if (document.fullscreenElement) void document.exitFullscreen();
+        else void rootRef.current?.requestFullscreen();
+    };
+
     const waiting = tickets.filter((t) => t.status === 'Esperando');
 
+    // Último paciente llamado en el último minuto y medio
+    const recentCall = tickets
+        .filter(
+            (t) =>
+                t.status === 'Recibido' &&
+                t.calledAt &&
+                now.getTime() - t.calledAt.getTime() < RECENT_CALL_MS,
+        )
+        .sort((a, b) => b.calledAt!.getTime() - a.calledAt!.getTime())[0];
+    const recentVet = getVet(recentCall?.vetId ?? null);
+
     return (
-        <div className="bg-slate-900 text-white rounded-3xl p-6 md:p-10 space-y-8 min-h-[70vh]">
-            <div className="flex items-center justify-between">
-                <h2 className="text-2xl md:text-4xl font-extrabold">Ahora atendiendo</h2>
-                <p className="text-2xl md:text-4xl font-mono text-teal-300">
-                    {now.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}
-                </p>
-            </div>
+        <div
+            ref={rootRef}
+            className={`bg-slate-900 text-white flex flex-col gap-6 ${isFullscreen
+                ? 'min-h-screen p-8 md:p-12 overflow-auto'
+                : 'rounded-3xl p-6 md:p-8 min-h-[75vh]'
+                }`}
+        >
+            {/* Encabezado */}
+            <header className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                    <span className="text-4xl" aria-hidden="true">🐾</span>
+                    <div className="leading-tight">
+                        <p className="text-2xl md:text-3xl font-extrabold">Sala de espera</p>
+                        <p className="text-sm text-slate-400">Atento a su número de turno</p>
+                    </div>
+                </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {VETERINARIANS.map((vet) => {
-                    const current = tickets.find((t) => t.status === 'Recibido' && t.vetId === vet.id);
-                    return (
-                        <div
-                            key={vet.id}
-                            className={`rounded-2xl p-5 text-center space-y-2 ${current ? 'bg-teal-600' : 'bg-slate-800'
-                                }`}
-                        >
-                            <p className="text-sm uppercase tracking-widest text-white/70">
-                                {vet.room}
-                            </p>
-                            <p className="text-lg font-semibold">{vet.name}</p>
-                            {current ? (
-                                <>
-                                    <p className="text-5xl md:text-6xl font-extrabold tracking-wide">
-                                        {current.ticketNumber}
-                                    </p>
-                                    <p className="text-xl">{current.petName}</p>
-                                </>
-                            ) : (
-                                <p className="text-2xl font-semibold text-emerald-300 py-4">
-                                    Disponible
-                                </p>
-                            )}
-                        </div>
-                    );
-                })}
-            </div>
+                <div className="flex items-center gap-4">
+                    <div className="text-right leading-tight">
+                        <p className="text-3xl md:text-5xl font-mono font-bold text-teal-300">
+                            {now.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                        <p className="text-sm text-slate-400 capitalize">
+                            {now.toLocaleDateString('es-CL', {
+                                weekday: 'long',
+                                day: 'numeric',
+                                month: 'long',
+                            })}
+                        </p>
+                    </div>
+                    <button
+                        onClick={toggleFullscreen}
+                        className="rounded-xl border border-white/20 px-3 py-2 text-sm font-semibold text-slate-200 hover:bg-white/10 transition"
+                    >
+                        {isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
+                    </button>
+                </div>
+            </header>
 
-            <div>
-                <h3 className="text-xl md:text-2xl font-bold mb-3">
-                    En espera{' '}
-                    <span className="text-slate-400 font-medium">({waiting.length})</span>
-                </h3>
+            {/* Aviso del último llamado */}
+            {recentCall && (
+                <div
+                    role="status"
+                    aria-live="polite"
+                    className="rounded-2xl bg-amber-400 text-slate-900 px-6 py-4 flex flex-wrap items-center gap-x-6 gap-y-1 animate-pulse"
+                >
+                    <span className="text-xs font-bold uppercase tracking-widest">Llamando</span>
+                    <span className="text-4xl md:text-5xl font-extrabold">
+                        {recentCall.ticketNumber}
+                    </span>
+                    <span className="text-xl md:text-2xl font-semibold">
+                        {recentCall.petName}, pase a {recentVet?.room ?? 'consulta'}
+                        {recentVet && ` · ${recentVet.name}`}
+                    </span>
+                </div>
+            )}
 
-                {waiting.length === 0 ? (
-                    <p className="text-slate-400 text-lg">No hay pacientes en espera.</p>
-                ) : (
-                    <ol className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {waiting.slice(0, MAX_VISIBLE).map((t, i) => {
-                            const preferred = getVet(t.preferredVetId);
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 flex-1">
+                {/* Ahora atendiendo */}
+                <section className="xl:col-span-2 space-y-3">
+                    <h2 className="text-sm font-bold uppercase tracking-widest text-slate-400">
+                        Ahora atendiendo
+                    </h2>
+                    <div className="grid grid-cols-[repeat(auto-fit,minmax(14rem,1fr))] gap-4">
+                        {VETERINARIANS.map((vet) => {
+                            const current = tickets.find(
+                                (t) => t.status === 'Recibido' && t.vetId === vet.id,
+                            );
                             return (
-                                <li
-                                    key={t.id}
-                                    className="flex items-center gap-4 bg-slate-800 rounded-xl px-4 py-3"
+                                <article
+                                    key={vet.id}
+                                    className={`rounded-2xl p-5 flex flex-col gap-4 border ${current
+                                        ? 'bg-teal-600 border-teal-400'
+                                        : 'bg-slate-800 border-slate-700'
+                                        }`}
                                 >
-                                    <span className="text-slate-400 font-bold w-6">{i + 1}</span>
-                                    <span className="text-2xl font-extrabold text-teal-300">
-                                        {t.ticketNumber}
-                                    </span>
-                                    <span className="flex-1 text-lg truncate">{t.petName}</span>
-                                    {preferred && (
-                                        <span className="text-sm text-slate-300">
-                                            con {preferred.name}
+                                    <div className="flex items-center gap-3">
+                                        <span
+                                            className={`w-12 h-12 shrink-0 rounded-full flex items-center justify-center font-bold text-lg ${current ? 'bg-white/20' : 'bg-slate-700'
+                                                }`}
+                                            aria-hidden="true"
+                                        >
+                                            {initials(vet.name)}
                                         </span>
-                                    )}
-                                </li>
+                                        <div className="leading-tight min-w-0">
+                                            <p className="font-semibold truncate">{vet.name}</p>
+                                            <p
+                                                className={`text-sm truncate ${current ? 'text-teal-100' : 'text-slate-400'
+                                                    }`}
+                                            >
+                                                {vet.specialty}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-end justify-between gap-3">
+                                        <span className="text-sm font-bold uppercase tracking-widest bg-black/20 rounded-lg px-2.5 py-1">
+                                            {vet.room}
+                                        </span>
+                                        {current ? (
+                                            <div className="text-right leading-tight">
+                                                <p className="text-5xl font-extrabold tracking-wide">
+                                                    {current.ticketNumber}
+                                                </p>
+                                                <p className="text-lg mt-1">{current.petName}</p>
+                                            </div>
+                                        ) : (
+                                            <p className="flex items-center gap-2 text-lg font-semibold text-emerald-300">
+                                                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+                                                Disponible
+                                            </p>
+                                        )}
+                                    </div>
+                                </article>
                             );
                         })}
-                    </ol>
-                )}
-                {waiting.length > MAX_VISIBLE && (
-                    <p className="mt-3 text-slate-400">
-                        y {waiting.length - MAX_VISIBLE} más en espera…
-                    </p>
-                )}
+                    </div>
+                </section>
+
+                {/* Próximos turnos */}
+                <section className="space-y-3">
+                    <h2 className="text-sm font-bold uppercase tracking-widest text-slate-400">
+                        Próximos turnos{' '}
+                        <span className="text-slate-500">({waiting.length})</span>
+                    </h2>
+
+                    {waiting.length === 0 ? (
+                        <div className="rounded-2xl bg-slate-800 border border-slate-700 p-6 text-center text-slate-400">
+                            No hay pacientes en espera.
+                        </div>
+                    ) : (
+                        <ol className="space-y-2">
+                            {waiting.slice(0, MAX_VISIBLE).map((t, i) => {
+                                const preferred = getVet(t.preferredVetId);
+                                return (
+                                    <li
+                                        key={t.id}
+                                        className={`flex items-center gap-4 rounded-xl px-4 py-3 border ${i === 0
+                                            ? 'bg-slate-700 border-teal-400'
+                                            : 'bg-slate-800 border-slate-700'
+                                            }`}
+                                    >
+                                        <span className="text-3xl font-extrabold text-teal-300 w-24 shrink-0">
+                                            {t.ticketNumber}
+                                        </span>
+                                        <div className="flex-1 min-w-0 leading-tight">
+                                            <p className="text-lg truncate">{t.petName}</p>
+                                            <p className="text-xs text-slate-400 truncate">
+                                                {i === 0 ? 'Siguiente · ' : ''}
+                                                {minutesSince(t.createdAt, now)} min de espera
+                                                {preferred && ` · ${preferred.name}`}
+                                            </p>
+                                        </div>
+                                    </li>
+                                );
+                            })}
+                        </ol>
+                    )}
+                    {/* Si hay mas en espera del limite visible renderizar esto */}
+                    {waiting.length > MAX_VISIBLE && (
+                        <p className="text-slate-400 text-sm">
+                            y {waiting.length - MAX_VISIBLE} más en espera…
+                        </p>
+                    )}
+                </section>
             </div>
         </div>
     );
