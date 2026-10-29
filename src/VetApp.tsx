@@ -4,7 +4,7 @@ import TicketForm from './components/TicketForm';
 import VetPanel from './components/VetPanel';
 import TicketList from './components/TicketList';
 import Sidebar, { type View } from './components/SideBar';
-import WaitingRoom from './components/WaitingForm';
+import WaitingRoom from './components/WaitingRoom';
 
 const getViewFromHash = (): View => (window.location.hash === '#sala' ? 'sala' : 'recepcion');
 
