@@ -1,4 +1,3 @@
-
 export type TicketStatus = 'Esperando' | 'Recibido' | 'Completado' | 'Cancelado';
 
 export type Species = 'Perro' | 'Gato' | 'Ave' | 'Conejo' | 'Otro';
@@ -9,7 +8,6 @@ export interface Veterinarian {
     specialty: string;
     room: string;
 }
-
 
 export interface Ticket {
     id: string;
@@ -30,6 +28,12 @@ export interface Ticket {
     calledAt: Date | null;
     completedAt: Date | null;
 }
+
+/** Lo que muestra la pantalla pública de la sala: sin RUT ni datos del dueño. */
+export type PublicTicket = Pick<
+    Ticket,
+    'id' | 'ticketNumber' | 'petName' | 'status' | 'preferredVetId' | 'vetId' | 'createdAt' | 'calledAt'
+>;
 
 export type NewTicketData = Pick<
     Ticket,

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { NewTicketData, Species, Ticket } from '../types/queue';
-import { VETERINARIANS } from '../data/Veterinarians.ts';
-import { formatRutInput, isValidRut } from '../utils/Rut.ts';
+import { VETERINARIANS } from '../data/Veterinarians';
+import { isValidRut, formatRutInput } from '../utils/Rut';
 
 const SPECIES: Species[] = ['Perro', 'Gato', 'Ave', 'Conejo', 'Otro'];
 
@@ -9,7 +9,7 @@ const inputClass =
     'w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition';
 
 interface Props {
-    onSubmit: (data: NewTicketData) => Ticket;
+    onSubmit: (data: NewTicketData) => Promise<Ticket>;
 }
 
 export default function TicketForm({ onSubmit }: Props) {
@@ -22,8 +22,10 @@ export default function TicketForm({ onSubmit }: Props) {
     const [preferredVetId, setPreferredVetId] = useState('');
     const [rutError, setRutError] = useState('');
     const [lastTicket, setLastTicket] = useState<Ticket | null>(null);
+    const [submitting, setSubmitting] = useState(false);
+    const [submitError, setSubmitError] = useState('');
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
         if (!isValidRut(rut)) {
@@ -31,15 +33,27 @@ export default function TicketForm({ onSubmit }: Props) {
             return;
         }
 
-        const ticket = onSubmit({
-            ownerRut: rut,
-            ownerName: ownerName.trim(),
-            ownerPhone: ownerPhone.trim(),
-            petName: petName.trim(),
-            species,
-            reason: reason.trim(),
-            preferredVetId: preferredVetId || null,
-        });
+        setSubmitting(true);
+        setSubmitError('');
+
+        let ticket: Ticket;
+        try {
+            ticket = await onSubmit({
+                ownerRut: rut,
+                ownerName: ownerName.trim(),
+                ownerPhone: ownerPhone.trim(),
+                petName: petName.trim(),
+                species,
+                reason: reason.trim(),
+                preferredVetId: preferredVetId || null,
+            });
+        } catch (error) {
+            console.error(error);
+            setSubmitError('No se pudo generar el ticket. Revisa tu conexión e inténtalo de nuevo.');
+            setSubmitting(false);
+            return;
+        }
+        setSubmitting(false);
 
         setLastTicket(ticket);
         setRut('');
@@ -193,11 +207,18 @@ export default function TicketForm({ onSubmit }: Props) {
                     </div>
                 </fieldset>
 
+                {submitError && (
+                    <p role="alert" className="text-sm text-red-600">
+                        {submitError}
+                    </p>
+                )}
+
                 <button
                     type="submit"
-                    className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-4 rounded-xl shadow-md hover:shadow-lg transition duration-200"
+                    disabled={submitting}
+                    className="w-full bg-teal-600 hover:bg-teal-700 disabled:opacity-60 text-white font-bold py-3 px-4 rounded-xl shadow-md hover:shadow-lg transition duration-200"
                 >
-                    Generar Ticket
+                    {submitting ? 'Generando…' : 'Generar Ticket'}
                 </button>
             </form>
         </section>

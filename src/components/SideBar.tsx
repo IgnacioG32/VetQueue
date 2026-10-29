@@ -12,6 +12,8 @@ interface Props {
     view: View;
     onChange: (view: View) => void;
     stats: Stats;
+    userEmail: string;
+    onSignOut: () => void;
 }
 
 const iconClass = 'w-5 h-5 shrink-0';
@@ -41,7 +43,7 @@ const NAV: { id: View; label: string; icon: ReactNode }[] = [
     { id: 'sala', label: 'Sala de espera', icon: TvIcon },
 ];
 
-export default function Sidebar({ view, onChange, stats }: Props) {
+export default function Sidebar({ view, onChange, stats, userEmail, onSignOut }: Props) {
     const openInNewScreen = () => {
         window.open(`${window.location.pathname}#sala`, '_blank', 'noopener');
     };
@@ -119,6 +121,19 @@ export default function Sidebar({ view, onChange, stats }: Props) {
                     Úsalo en el monitor de la sala. Debe estar en este mismo computador para
                     actualizarse solo.
                 </p>
+            </div>
+
+            {/* Sesión */}
+            <div className="flex items-center justify-between gap-3 rounded-xl bg-white/10 px-3 py-2 text-sm">
+                <span className="truncate text-teal-50" title={userEmail}>
+                    {userEmail}
+                </span>
+                <button
+                    onClick={onSignOut}
+                    className="shrink-0 font-semibold text-teal-100 underline hover:text-white"
+                >
+                    Salir
+                </button>
             </div>
         </aside>
     );

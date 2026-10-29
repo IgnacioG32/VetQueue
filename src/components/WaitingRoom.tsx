@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Ticket } from '../types/queue';
+import type { PublicTicket } from '../types/queue';
 import { minutesSince, useNow } from '../hooks/useNow';
 import { useCallSound } from '../hooks/useCallSound';
 import { getVet, VETERINARIANS } from '../data/Veterinarians';
 
 interface Props {
-    tickets: Ticket[];
+    tickets: PublicTicket[];
 }
 
 const MAX_VISIBLE = 8;
-const RECENT_CALL_MS = 40_000; // cuánto tiempo se destaca el último llamado
+const RECENT_CALL_MS = 90_000; // cuánto tiempo se destaca el último llamado
 
 const initials = (name: string) =>
     name
