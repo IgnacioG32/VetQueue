@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Ticket } from '../types/queue';
 import { minutesSince, useNow } from '../hooks/useNow';
-import { getVet, VETERINARIANS } from '../data/Veterinarians';
 import { useCallSound } from '../hooks/useCallSound';
+import { getVet, VETERINARIANS } from '../data/Veterinarians';
 
 interface Props {
     tickets: Ticket[];
 }
 
 const MAX_VISIBLE = 8;
-const RECENT_CALL_MS = 90_000; // cuánto tiempo se destaca el último llamado
+const RECENT_CALL_MS = 40_000; // cuánto tiempo se destaca el último llamado
 
 const initials = (name: string) =>
     name
@@ -22,7 +22,7 @@ const initials = (name: string) =>
 
 /** Pantalla para el monitor de la sala de espera. No muestra RUT ni datos del dueño. */
 export default function WaitingRoom({ tickets }: Props) {
-    const now = useNow(5_000);
+    const now = useNow(1_000); // 1 s para que el reloj muestre los segundos
     const rootRef = useRef<HTMLDivElement>(null);
     const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -96,7 +96,11 @@ export default function WaitingRoom({ tickets }: Props) {
                 <div className="flex items-center gap-4">
                     <div className="text-right leading-tight">
                         <p className="text-3xl md:text-5xl font-mono font-bold text-teal-300">
-                            {now.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}
+                            {now.toLocaleTimeString('es-CL', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                second: '2-digit',
+                            })}
                         </p>
                         <p className="text-sm text-slate-400 capitalize">
                             {now.toLocaleDateString('es-CL', {
