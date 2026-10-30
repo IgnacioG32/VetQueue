@@ -9,7 +9,7 @@ interface Props {
 }
 
 const MAX_VISIBLE = 8;
-const RECENT_CALL_MS = 90_000; // cuánto tiempo se destaca el último llamado
+const RECENT_CALL_MS = 40_000; // cuánto tiempo se destaca el último llamado
 
 const initials = (name: string) =>
     name
