@@ -26,6 +26,7 @@ Navegación entre Recepción y Sala de espera, resumen del día (en espera, aten
 - [React](https://react.dev/) + [TypeScript](https://www.typescriptlang.org/)
 - [Vite](https://vite.dev/)
 - [Tailwind CSS](https://tailwindcss.com/) v4
+- [FireBase](https://firebase.google.com/?hl=es-419)
 
 ## Instalación y uso
 
