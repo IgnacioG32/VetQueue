@@ -2,7 +2,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
-// Las claves viven en .env.local (ver .env.example). Vite solo expone las que empiezan con VITE_
+// La configuración vive en .env (plantilla: env.example). Vite solo expone variables VITE_.
 const config = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
     authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,

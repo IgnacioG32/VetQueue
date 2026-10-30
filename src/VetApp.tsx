@@ -137,8 +137,8 @@ function VetApp() {
         <p className="text-4xl">🐾</p>
         <h1 className="text-2xl font-extrabold text-teal-800">Falta configurar Firebase</h1>
         <p>
-          Crea el archivo <code className="font-mono">.env.local</code> en la raíz del proyecto con
-          las variables que aparecen en <code className="font-mono">.env.example</code>, y reinicia{' '}
+          Crea el archivo <code className="font-mono">.env</code> en la raíz del proyecto con
+          las variables que aparecen en <code className="font-mono">env.example</code>, y reinicia{' '}
           <code className="font-mono">npm run dev</code>.
         </p>
       </CenteredMessage>
