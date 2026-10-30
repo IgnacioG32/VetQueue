@@ -81,9 +81,6 @@ src/
 
 Los veterinarios, sus especialidades y boxes están en `src/data/veterinarians.ts`. Edita ese archivo para reflejar al equipo real de la clínica.
 
-## Cómo se guardan los datos
-
-Los turnos se guardan en el `localStorage` del navegador, por lo que no se pierden al recargar y el historial se conserva entre días. La recepción y la sala de espera se sincronizan entre pestañas del **mismo navegador y computador**.
 
 ### Limitaciones actuales
 - Recepción y sala de espera deben estar en el mismo computador y navegador. Para usarlos en equipos distintos hace falta un backend.
@@ -92,8 +89,7 @@ Los turnos se guardan en el `localStorage` del navegador, por lo que no se pierd
 
 ## Próximos pasos
 
-- [ ] Backend con base de datos (por ejemplo Supabase o Firebase) para usar varios equipos.
 - [ ] Citas agendadas con fecha y hora.
-- [ ] Inicio de sesión para recepción y veterinarios.
+- [ ] Inicio de sesión para recepción y veterinarios. (Faltan los 
 - [ ] Ficha de historial por mascota.
 - [ ] Notificaciones al dueño (SMS o WhatsApp) cuando se acerque su turno.
