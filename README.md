@@ -26,7 +26,7 @@ Navegación entre Recepción y Sala de espera, resumen del día (en espera, aten
 - [React](https://react.dev/) + [TypeScript](https://www.typescriptlang.org/)
 - [Vite](https://vite.dev/)
 - [Tailwind CSS](https://tailwindcss.com/) v4
-- [FireBase](https://firebase.google.com/?hl=es-419)
+- [Firebase](https://firebase.google.com/) (Auth + Firestore)
 
 ## Instalación y uso
 
@@ -81,15 +81,23 @@ src/
 
 Los veterinarios, sus especialidades y boxes están en `src/data/veterinarians.ts`. Edita ese archivo para reflejar al equipo real de la clínica.
 
+## Cómo se guardan los datos
+
+Los turnos y los empleados se guardan en **Firebase Firestore** (colecciones `tickets`, `board`, `counters/{day}` y `employees/{uid}`), así que la recepción y la sala de espera pueden usarse en **equipos distintos**. El monitor de la sala (`/#sala`) es público y no requiere iniciar sesión. Las reglas de seguridad están versionadas en `firestore.rules` y `storage.rules` (hay que publicarlas en la consola).
 
 ### Limitaciones actuales
-- Recepción y sala de espera deben estar en el mismo computador y navegador. Para usarlos en equipos distintos hace falta un backend.
-- No hay inicio de sesión ni roles de usuario.
+- No hay notificaciones automáticas al dueño (WhatsApp/SMS) todavía. **Pendiente / en evaluación.**
 - No hay citas agendadas con fecha y hora, solo turnos del día.
+- La deshabilitación y eliminación de empleados es lógica (en Firestore); el borrado real de la cuenta de Auth requiere backend (Admin SDK).
 
 ## Próximos pasos
 
+- [x] Backend con Firebase (Firestore + Auth) para usar varios equipos.
+- [x] Inicio de sesión + creación de cuentas de empleados (admin por custom claim `role: 'admin'`).
+- [x] Reglas de Firestore/Storage versionadas (`firestore.rules`, `storage.rules`).
+- [x] Vista de Empleados: crear, editar nombre/RUT, deshabilitar, eliminar (con confirmación doble).
+- [ ] Notificaciones al dueño (SMS o WhatsApp) cuando se acerque su turno. **Pendiente / en evaluación.**
 - [ ] Citas agendadas con fecha y hora.
-- [ ] Inicio de sesión para recepción y veterinarios. (Faltan los 
 - [ ] Ficha de historial por mascota.
-- [ ] Notificaciones al dueño (SMS o WhatsApp) cuando se acerque su turno.
+- [ ] Borrado real de cuentas de Auth (requiere backend/Admin SDK).
+- [ ] Tests (Vitest + RTL) y reglas con Firebase Emulators.
