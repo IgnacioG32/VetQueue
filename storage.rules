@@ -1,0 +1,42 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated()
+        && request.auth.token.role == 'admin';
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated()
+        && request.auth.uid == userId;
+    }
+
+    function isValidFile() {
+      return request.resource != null
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches(
+          'image/(jpeg|png|webp)|application/pdf'
+        );
+    }
+
+    match /users/{userId}/{filePath=**} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create, update: if
+        (isOwner(userId) || isAdmin())
+        && isValidFile();
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
+    match /public/{filePath=**} {
+      allow read: if true;
+      allow create, update: if isAdmin() && isValidFile();
+      allow delete: if isAdmin();
+    }
+  }
+}

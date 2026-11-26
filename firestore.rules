@@ -1,0 +1,38 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAuth()  { return request.auth != null; }
+    function isAdmin() { return isAuth() && request.auth.token.role == 'admin'; }
+
+    function myProfilePath() {
+      return /databases/$(database)/documents/employees/$(request.auth.uid);
+    }
+    function isBlocked() {
+      return isAuth() && exists(myProfilePath())
+        && (get(myProfilePath()).data.disabled == true
+            || get(myProfilePath()).data.deleted == true);
+    }
+    function isActive() { return isAuth() && !isBlocked(); }
+
+    match /tickets/{ticketId} {
+      allow read, create, update: if isActive();
+      allow delete: if isAdmin();
+    }
+    match /board/{ticketId} {
+      allow read: if true;
+      allow create, update, delete: if isActive();
+    }
+    match /counters/{day} {
+      allow read, write: if isActive();
+    }
+
+    match /employees/{uid} {
+      allow read: if isAuth() && (isAdmin() || request.auth.uid == uid);
+      allow create: if isAdmin();
+      allow update: if isAdmin()
+        && !(request.auth.uid == uid && request.resource.data.disabled == true);
+      allow delete: if false;
+    }
+  }
+}

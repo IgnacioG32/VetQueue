@@ -1,150 +1,189 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+    collection,
+    doc,
+    onSnapshot,
+    query,
+    runTransaction,
+    serverTimestamp,
+    where,
+    writeBatch,
+} from 'firebase/firestore';
+import { db } from '../lib/firebase';
 import type { NewTicketData, Ticket } from '../types/queue';
+import { useToday, dayKey } from './useToday';
+import { byCreatedAt, toTicket } from '../lib/fireStoreMappers';
 
-const STORAGE_KEY = 'vetqueue:v1';
-
-interface QueueState {
-    tickets: Ticket[]; // historial completo
-    counter: number; // correlativo del día
-    day: string; // YYYY-MM-DD del correlativo
-}
-
-const dayKey = (d: Date = new Date()) => d.toLocaleDateString('en-CA');
-
-const reviveDate = (value: unknown): Date | null =>
-    typeof value === 'string' || typeof value === 'number' ? new Date(value) : null;
-
-const reviveTicket = (raw: Ticket): Ticket => ({
-    ...raw,
-    createdAt: reviveDate(raw.createdAt) ?? new Date(),
-    calledAt: reviveDate(raw.calledAt),
-    completedAt: reviveDate(raw.completedAt),
-});
-
-function load(): QueueState {
-    const today = dayKey();
-    const empty: QueueState = { tickets: [], counter: 1, day: today };
-    try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) return empty;
-        const parsed = JSON.parse(raw) as Partial<QueueState>;
-        return {
-            tickets: (parsed.tickets ?? []).map(reviveTicket),
-            // El correlativo VET-01, VET-02... se reinicia cada día
-            counter: parsed.day === today ? (parsed.counter ?? 1) : 1,
-            day: today,
-        };
-    } catch {
-        return empty;
-    }
-}
+const ACTION_ERROR = 'No se pudo completar la acción. Revisa tu conexión e inténtalo de nuevo.';
 
 /**
- * Cola de turnos persistida en localStorage.
- * Se sincroniza entre pestañas: la pantalla de sala de espera
- * puede estar abierta en otro monitor y se actualiza sola.
+ * Cola de turnos en Firestore (solo personal con sesión iniciada).
+ *
+ * Cada turno se guarda en dos lugares:
+ *  - `tickets/{id}`: ficha completa (dueño, RUT, teléfono...). Solo personal.
+ *  - `board/{id}`: datos públicos para la pantalla de la sala (sin datos del dueño).
  */
 export function useQueue() {
-    const [state, setState] = useState<QueueState>(load);
+    const day = useToday();
+    const [tickets, setTickets] = useState<Ticket[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
+    // Escucha en tiempo real los turnos de hoy
     useEffect(() => {
-        const onStorage = (e: StorageEvent) => {
-            if (e.key === STORAGE_KEY || e.key === null) setState(load());
-        };
-        window.addEventListener('storage', onStorage);
-        return () => window.removeEventListener('storage', onStorage);
-    }, []);
+        const q = query(collection(db, 'tickets'), where('day', '==', day));
+        return onSnapshot(
+            q,
+            (snapshot) => {
+                setTickets(
+                    snapshot.docs
+                        .map((d) => toTicket(d.id, d.data({ serverTimestamps: 'estimate' })))
+                        .sort(byCreatedAt),
+                );
+                setLoading(false);
+                setError(null);
+            },
+            (err) => {
+                console.error(err);
+                setLoading(false);
+                setError(
+                    'No se pudieron leer los turnos. Revisa tu conexión y las reglas de Firestore.',
+                );
+            },
+        );
+    }, [day]);
 
-    // Siempre parte desde lo último guardado para no pisar cambios de otra pestaña
-    const update = useCallback((fn: (s: QueueState) => QueueState) => {
-        const next = fn(load());
+    const run = useCallback(async (action: () => Promise<void>) => {
+        setError(null);
         try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-        } catch {
-            // almacenamiento lleno o bloqueado: seguimos solo en memoria
+            await action();
+        } catch (err) {
+            console.error(err);
+            setError(ACTION_ERROR);
         }
-        setState(next);
     }, []);
 
-    const addTicket = useCallback(
-        (data: NewTicketData): Ticket => {
-            let created!: Ticket;
-            update((s) => {
-                created = {
-                    id: crypto.randomUUID(),
-                    ticketNumber: `VET-${String(s.counter).padStart(2, '0')}`,
-                    ...data,
-                    vetId: null,
-                    status: 'Esperando',
-                    createdAt: new Date(),
-                    calledAt: null,
-                    completedAt: null,
-                };
-                return { ...s, tickets: [...s.tickets, created], counter: s.counter + 1 };
+    /** Crea el turno con un correlativo diario que no se repite entre equipos (transacción). */
+    const addTicket = useCallback(async (data: NewTicketData): Promise<Ticket> => {
+        const today = dayKey();
+        const ticketRef = doc(collection(db, 'tickets'));
+        const boardRef = doc(db, 'board', ticketRef.id);
+        const counterRef = doc(db, 'counters', today);
+
+        const ticketNumber = await runTransaction(db, async (tx) => {
+            const counterSnap = await tx.get(counterRef);
+            const next = (counterSnap.exists() ? Number(counterSnap.data().value) : 0) + 1;
+            const number = `VET-${String(next).padStart(2, '0')}`;
+
+            tx.set(counterRef, { value: next });
+            tx.set(ticketRef, {
+                ...data,
+                ticketNumber: number,
+                day: today,
+                vetId: null,
+                status: 'Esperando',
+                createdAt: serverTimestamp(),
+                calledAt: null,
+                completedAt: null,
             });
-            return created;
-        },
-        [update],
+            tx.set(boardRef, {
+                ticketNumber: number,
+                petName: data.petName,
+                day: today,
+                preferredVetId: data.preferredVetId,
+                vetId: null,
+                status: 'Esperando',
+                createdAt: serverTimestamp(),
+                calledAt: null,
+            });
+            return number;
+        });
+
+        return {
+            id: ticketRef.id,
+            ticketNumber,
+            ...data,
+            vetId: null,
+            status: 'Esperando',
+            createdAt: new Date(),
+            calledAt: null,
+            completedAt: null,
+        };
+    }, []);
+
+    /**
+     * Llama al siguiente paciente elegible (el más antiguo que no pidió a otro veterinario).
+     * La transacción confirma que nadie más lo tomó mientras tanto.
+     */
+    const callNext = useCallback(
+        (vetId: string) =>
+            run(async () => {
+                if (tickets.some((t) => t.status === 'Recibido' && t.vetId === vetId)) return;
+
+                const candidates = tickets
+                    .filter(
+                        (t) =>
+                            t.status === 'Esperando' &&
+                            (t.preferredVetId === null || t.preferredVetId === vetId),
+                    )
+                    .slice(0, 5);
+
+                await runTransaction(db, async (tx) => {
+                    for (const candidate of candidates) {
+                        const ref = doc(db, 'tickets', candidate.id);
+                        const snap = await tx.get(ref);
+                        if (snap.exists() && snap.data().status === 'Esperando') {
+                            tx.update(ref, {
+                                status: 'Recibido',
+                                vetId,
+                                calledAt: serverTimestamp(),
+                            });
+                            tx.update(doc(db, 'board', candidate.id), {
+                                status: 'Recibido',
+                                vetId,
+                                calledAt: serverTimestamp(),
+                            });
+                            return;
+                        }
+                    }
+                });
+            }),
+        [run, tickets],
     );
 
-    /** Llama al siguiente paciente elegible (el más antiguo que no pidió a otro veterinario). */
-    const callNext = useCallback(
-        (vetId: string) => {
-            update((s) => {
-                const busy = s.tickets.some((t) => t.status === 'Recibido' && t.vetId === vetId);
-                if (busy) return s;
-                const next = s.tickets.find(
-                    (t) =>
-                        t.status === 'Esperando' &&
-                        (t.preferredVetId === null || t.preferredVetId === vetId),
-                );
-                if (!next) return s;
-                return {
-                    ...s,
-                    tickets: s.tickets.map((t) =>
-                        t.id === next.id
-                            ? { ...t, status: 'Recibido' as const, vetId, calledAt: new Date() }
-                            : t,
-                    ),
-                };
-            });
-        },
-        [update],
+    const finish = useCallback(
+        (ticketId: string, status: 'Completado' | 'Cancelado') =>
+            run(async () => {
+                const batch = writeBatch(db);
+                batch.update(doc(db, 'tickets', ticketId), {
+                    status,
+                    completedAt: serverTimestamp(),
+                });
+                batch.update(doc(db, 'board', ticketId), { status });
+                await batch.commit();
+            }),
+        [run],
     );
 
     const complete = useCallback(
         (ticketId: string) => {
-            update((s) => ({
-                ...s,
-                tickets: s.tickets.map((t) =>
-                    t.id === ticketId && t.status === 'Recibido'
-                        ? { ...t, status: 'Completado' as const, completedAt: new Date() }
-                        : t,
-                ),
-            }));
+            if (tickets.find((t) => t.id === ticketId)?.status !== 'Recibido') return;
+            void finish(ticketId, 'Completado');
         },
-        [update],
+        [finish, tickets],
     );
 
     const cancel = useCallback(
         (ticketId: string) => {
-            update((s) => ({
-                ...s,
-                tickets: s.tickets.map((t) =>
-                    t.id === ticketId && (t.status === 'Esperando' || t.status === 'Recibido')
-                        ? { ...t, status: 'Cancelado' as const, completedAt: new Date() }
-                        : t,
-                ),
-            }));
+            const status = tickets.find((t) => t.id === ticketId)?.status;
+            if (status !== 'Esperando' && status !== 'Recibido') return;
+            void finish(ticketId, 'Cancelado');
         },
-        [update],
+        [finish, tickets],
     );
 
-    // Solo los turnos de hoy se muestran; el historial queda guardado
-    const tickets = useMemo(() => {
-        const today = dayKey();
-        return state.tickets.filter((t) => dayKey(t.createdAt) === today);
-    }, [state.tickets]);
-
-    return { tickets, addTicket, callNext, complete, cancel };
+    return useMemo(
+        () => ({ tickets, loading, error, addTicket, callNext, complete, cancel }),
+        [tickets, loading, error, addTicket, callNext, complete, cancel],
+    );
 }
