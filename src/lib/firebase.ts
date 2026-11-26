@@ -1,4 +1,4 @@
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApps } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
@@ -28,3 +28,16 @@ const app = initializeApp(
 
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+
+/** Auth secundario para crear cuentas sin cerrar la sesión del admin. */
+export function getSecondaryAuth() {
+    const secondaryApp =
+        getApps().find((a) => a.name === 'secondary') ??
+        initializeApp(
+            isFirebaseConfigured
+                ? config
+                : { apiKey: 'not-configured', projectId: 'not-configured', appId: 'not-configured' },
+            'secondary',
+        );
+    return getAuth(secondaryApp);
+}

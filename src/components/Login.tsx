@@ -21,6 +21,8 @@ function messageFor(error: unknown): string {
                 return 'Demasiados intentos. Espera unos minutos e inténtalo de nuevo.';
             case 'auth/network-request-failed':
                 return 'Sin conexión. Revisa tu internet e inténtalo de nuevo.';
+            case 'auth/user-disabled':
+                return 'Esta cuenta está deshabilitada.';
         }
     }
     return 'No se pudo iniciar sesión. Inténtalo de nuevo.';
@@ -39,7 +41,7 @@ export default function Login({ onSignIn, onShowWaitingRoom }: Props) {
         try {
             await onSignIn(email.trim(), password);
         } catch (err) {
-            console.log("Error original de firebase: ", err)
+            console.log('Error original de firebase: ', err);
             setError(messageFor(err));
             setSubmitting(false);
         }
