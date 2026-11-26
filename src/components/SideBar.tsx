@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-export type View = 'recepcion' | 'sala';
+export type View = 'recepcion' | 'sala' | 'empleados';
 
 interface Stats {
     waiting: number;
@@ -14,6 +14,7 @@ interface Props {
     stats: Stats;
     userEmail: string;
     onSignOut: () => void;
+    isAdmin?: boolean;
 }
 
 const iconClass = 'w-5 h-5 shrink-0';
@@ -38,15 +39,27 @@ const ExternalIcon = (
     </svg>
 );
 
-const NAV: { id: View; label: string; icon: ReactNode }[] = [
+const UsersIcon = (
+    <svg className={iconClass} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+        <circle cx="9" cy="7" r="4" />
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+);
+
+const BASE_NAV: { id: View; label: string; icon: ReactNode }[] = [
     { id: 'recepcion', label: 'Recepción', icon: ClipboardIcon },
     { id: 'sala', label: 'Sala de espera', icon: TvIcon },
 ];
 
-export default function Sidebar({ view, onChange, stats, userEmail, onSignOut }: Props) {
+export default function Sidebar({ view, onChange, stats, userEmail, onSignOut, isAdmin }: Props) {
     const openInNewScreen = () => {
         window.open(`${window.location.pathname}#sala`, '_blank', 'noopener');
     };
+
+    const nav = isAdmin
+        ? [...BASE_NAV, { id: 'empleados' as View, label: 'Empleados', icon: UsersIcon }]
+        : BASE_NAV;
 
     return (
         <aside className="bg-teal-900 text-white flex flex-col gap-4 p-4 lg:w-64 lg:shrink-0 lg:sticky lg:top-0 lg:h-screen lg:p-5">
@@ -61,7 +74,7 @@ export default function Sidebar({ view, onChange, stats, userEmail, onSignOut }:
 
             {/* Navegación */}
             <nav aria-label="Vistas" className="flex gap-2 lg:flex-col">
-                {NAV.map((item) => {
+                {nav.map((item) => {
                     const active = view === item.id;
                     return (
                         <button
@@ -124,16 +137,18 @@ export default function Sidebar({ view, onChange, stats, userEmail, onSignOut }:
             </div>
 
             {/* Sesión */}
-            <div className="flex items-center justify-between gap-3 rounded-xl bg-white/10 px-3 py-2 text-sm">
-                <span className="truncate text-teal-50" title={userEmail}>
-                    {userEmail}
-                </span>
-                <button
-                    onClick={onSignOut}
-                    className="shrink-0 font-semibold text-teal-100 underline hover:text-white"
-                >
-                    Salir
-                </button>
+            <div className="space-y-2">
+                <div className="flex items-center justify-between gap-3 rounded-xl bg-white/10 px-3 py-2 text-sm">
+                    <span className="truncate text-teal-50" title={userEmail}>
+                        {userEmail}
+                    </span>
+                    <button
+                        onClick={onSignOut}
+                        className="shrink-0 font-semibold text-teal-100 underline hover:text-white"
+                    >
+                        Salir
+                    </button>
+                </div>
             </div>
         </aside>
     );

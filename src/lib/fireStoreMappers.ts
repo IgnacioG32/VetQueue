@@ -1,5 +1,6 @@
 import { Timestamp, type DocumentData } from 'firebase/firestore';
 import type { PublicTicket, Species, Ticket, TicketStatus } from '../types/queue';
+import type { Employee } from '../types/employee';
 
 export const toDate = (value: unknown): Date | null =>
     value instanceof Timestamp ? value.toDate() : null;
@@ -40,3 +41,16 @@ export function toPublicTicket(id: string, x: DocumentData): PublicTicket {
 
 export const byCreatedAt = <T extends { createdAt: Date; ticketNumber: string }>(a: T, b: T) =>
     a.createdAt.getTime() - b.createdAt.getTime() || a.ticketNumber.localeCompare(b.ticketNumber);
+
+export function toEmployee(id: string, x: DocumentData): Employee {
+    return {
+        uid: id,
+        name: String(x.name ?? ''),
+        email: String(x.email ?? ''),
+        rut: x.rut ? String(x.rut) : null,
+        role: (x.role ?? 'employee') as 'admin' | 'employee',
+        disabled: Boolean(x.disabled),
+        deleted: Boolean(x.deleted),
+        createdAt: toDate(x.createdAt),
+    };
+}

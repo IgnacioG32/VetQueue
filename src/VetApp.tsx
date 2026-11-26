@@ -6,13 +6,19 @@ import VetPanel from './components/VetPanel';
 import TicketList from './components/TicketList';
 import WaitingRoom from './components/WaitingRoom';
 import PublicWaitingRoom from './components/PublicWaitingRoom.tsx';
+import Employees from './components/Employees';
 import { isFirebaseConfigured } from './lib/firebase';
 import { useAuth } from './hooks/useAuth';
+import { useEmployeeStatus } from './hooks/useEmployeeStatus';
 import Login from './components/Login';
 import type { View } from './components/SideBar.tsx';
 import Sidebar from './components/SideBar.tsx';
 
-const getViewFromHash = (): View => (window.location.hash === '#sala' ? 'sala' : 'recepcion');
+const getViewFromHash = (): View => {
+  if (window.location.hash === '#sala') return 'sala';
+  if (window.location.hash === '#empleados') return 'empleados';
+  return 'recepcion';
+};
 
 const PAGE_INFO: Record<View, { title: string; subtitle: string }> = {
   recepcion: {
@@ -22,6 +28,10 @@ const PAGE_INFO: Record<View, { title: string; subtitle: string }> = {
   sala: {
     title: 'Sala de espera',
     subtitle: 'Así verán los clientes la cola en el monitor de la sala.',
+  },
+  empleados: {
+    title: 'Empleados',
+    subtitle: 'Gestiona las cuentas del personal de la clínica.',
   },
 };
 
@@ -37,12 +47,22 @@ interface AuthedAppProps {
   user: User;
   view: View;
   onChangeView: (view: View) => void;
-  onSignOut: () => void;
+  onSignOut: () => Promise<void>;
+  isAdmin: boolean;
+  createEmployeeAccount: (email: string, displayName: string, rut: string | null) => Promise<unknown>;
+  ensureEmployeeProfile: (user: User, role: 'admin' | 'employee') => Promise<void>;
 }
 
 /** App para el personal: solo se monta con sesión iniciada. */
-function AuthedApp({ user, view, onChangeView, onSignOut }: AuthedAppProps) {
+function AuthedApp({ user, view, onChangeView, onSignOut, isAdmin, createEmployeeAccount, ensureEmployeeProfile }: AuthedAppProps) {
   const { tickets, loading, error, addTicket, callNext, complete, cancel } = useQueue();
+  const blockedMessage = useEmployeeStatus(user, onSignOut);
+
+  useEffect(() => {
+    if (isAdmin) {
+      void ensureEmployeeProfile(user, 'admin');
+    }
+  }, [isAdmin, user, ensureEmployeeProfile]);
 
   const stats = useMemo(
     () => ({
@@ -61,8 +81,9 @@ function AuthedApp({ user, view, onChangeView, onSignOut }: AuthedAppProps) {
         view={view}
         onChange={onChangeView}
         stats={stats}
-        userEmail={user.email ?? 'Sesión iniciada'}
+        userEmail={user.displayName || user.email || 'Sesión iniciada'}
         onSignOut={onSignOut}
+        isAdmin={isAdmin}
       />
 
       <main className="flex-1 min-w-0 p-4 md:p-8 space-y-6">
@@ -107,16 +128,30 @@ function AuthedApp({ user, view, onChangeView, onSignOut }: AuthedAppProps) {
               <TicketList tickets={tickets} onCancel={cancel} />
             </div>
           </div>
+        ) : view === 'empleados' ? (
+          <Employees
+            user={user}
+            isAdmin={isAdmin}
+            createEmployeeAccount={createEmployeeAccount}
+          />
         ) : (
           <WaitingRoom tickets={tickets} />
         )}
       </main>
+
+      {blockedMessage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm bg-white rounded-2xl shadow-lg p-6 space-y-3 text-center">
+            <p role="alert" className="text-red-600 font-semibold">{blockedMessage}</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 function VetApp() {
-  const { user, loading, signIn, signOut } = useAuth();
+  const { user, loading, isAdmin, signIn, createEmployeeAccount, ensureEmployeeProfile, signOut } = useAuth();
   const [view, setView] = useState<View>(getViewFromHash);
 
   // Permite abrir una vista directo con /#sala (por ejemplo en otro monitor)
@@ -156,7 +191,15 @@ function VetApp() {
   }
 
   return (
-    <AuthedApp user={user} view={view} onChangeView={changeView} onSignOut={() => void signOut()} />
+    <AuthedApp
+      user={user}
+      view={view}
+      onChangeView={changeView}
+      onSignOut={async () => { await signOut(); }}
+      isAdmin={isAdmin}
+      createEmployeeAccount={createEmployeeAccount}
+      ensureEmployeeProfile={ensureEmployeeProfile}
+    />
   );
 }
 
